@@ -1,20 +1,20 @@
+import os
+
 class Config:
-    BOT_TOKEN = "your-bot-token"
-    API_ID = "your-api-id"
-    API_HASH = "your-api-hash"
-    DATABASE_URL = "your-mongodb-url"
-    ADMINS = [123456789, 987654321]  # Replace with Telegram Admin User IDs
+    API_ID = int(os.getenv("API_ID", "0"))  # Ensures API_ID is an integer
+    API_HASH = os.getenv("API_HASH", "")  # Should be a valid hash
+    BOT_TOKEN = os.getenv("BOT_TOKEN", "")  # Bot token from BotFather
+    DATABASE_URL = os.getenv("DATABASE_URL", "")  # MongoDB connection URL
+    SHORTENER_API = os.getenv("SHORTENER_API", "")  # Your shortener API key
+    SHORTENER_URL = os.getenv("SHORTENER_URL", "")  # Your shortener site URL
+    ADMINS = list(map(int, os.getenv("ADMINS", "").split()))  # List of admin user IDs
+    PAYMENT_UPI = os.getenv("PAYMENT_UPI", "")  # UPI ID for payments
+    PAYMENT_QR = os.getenv("PAYMENT_QR", "")  # QR code URL for payments
 
-    # Shortener API
-    SHORTENER_API = "your-shortener-api-key"
-    SHORTENER_URL = "https://yourshortener.com/api"
-
-    # Premium System
-    PAYMENT_QR = "your-gpay-qr-url"
-    PAYMENT_UPI = "your-upi-id"
-    PRICING = {
-        20: 50,
-        35: 100,
-        45: 150,
-        60: 300
+    # Pricing for Premium Tokens (₹ → Tokens)
+    TOKEN_PRICING = {
+        20: 50,   # ₹20 → 50 Tokens
+        35: 100,  # ₹35 → 100 Tokens
+        45: 150,  # ₹45 → 150 Tokens
+        60: 300   # ₹60 → 300 Tokens
     }
