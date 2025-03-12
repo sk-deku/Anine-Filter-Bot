@@ -48,9 +48,6 @@ async def send_file(client, query):
 def home():
     return "Bot is running!"
 
-def run_web():
-    app.run(host="0.0.0.0", port=8000)
-
 # Start bot and web server
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
