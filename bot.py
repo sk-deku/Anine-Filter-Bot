@@ -3,6 +3,8 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import get_files, get_tokens, deduct_token
 from verification import send_verification_link
 from config import Config
+from flask import Flask
+import threading
 
 bot = Client("AutoFilterBot", bot_token=Config.BOT_TOKEN, api_id=Config.API_ID, api_hash=Config.API_HASH)
 
@@ -42,4 +44,16 @@ async def send_file(client, query):
     else:
         await send_verification_link(bot, query.message)
 
-bot.run()
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=8000)
+
+# Start the bot and web server together
+if __name__ == "__main__":
+    threading.Thread(target=run_web).start()
+    bot.run()
