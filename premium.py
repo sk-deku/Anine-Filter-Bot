@@ -19,8 +19,7 @@ async def premium_info(client, message):
     pricing_text += "\n✅ **Send payment screenshot to the admin to get tokens!**"
 
     # Payment buttons
-    buttons = [
-        [InlineKeyboardButton("📥 Pay via UPI", url=f"upi://pay?pa={PAYMENT_UPI}")]
+    buttons = [InlineKeyboardButton("📥 Pay via UPI", url=f"upi://pay?pa={PAYMENT_UPI}")]
 
     if PAYMENT_QR:
         buttons.insert(0, [InlineKeyboardButton("📸 Scan QR to Pay", url=PAYMENT_QR)])
