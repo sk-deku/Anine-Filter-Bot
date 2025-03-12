@@ -44,8 +44,7 @@ async def send_file(client, query):
         await query.answer("📂 File sent in DM!", show_alert=True)
     else:
         await send_verification_link(bot, query.message)
-
-@app.route('/')
+        
 def home():
     return "Bot is running!"
 
