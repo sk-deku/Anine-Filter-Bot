@@ -50,5 +50,4 @@ def home():
 
 # Start bot and web server
 if __name__ == "__main__":
-    threading.Thread(target=run_web).start()
     bot.run()
