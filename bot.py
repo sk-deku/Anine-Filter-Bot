@@ -3,7 +3,6 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import get_files, get_tokens, deduct_token
 from verification import send_verification_link
 from config import Config
-from flask import Flask
 import threading
 
 bot = Client("AutoFilterBot", bot_token=Config.BOT_TOKEN, api_id=int(Config.API_ID), api_hash=Config.API_HASH)
@@ -45,9 +44,6 @@ async def send_file(client, query):
         await query.answer("📂 File sent in DM!", show_alert=True)
     else:
         await send_verification_link(bot, query.message)
-
-# Web server for Koyeb
-app = Flask(__name__)
 
 @app.route('/')
 def home():
