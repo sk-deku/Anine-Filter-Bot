@@ -6,9 +6,9 @@ from config import Config
 from flask import Flask
 import threading
 
-bot = Client("AutoFilterBot", bot_token=Config.BOT_TOKEN, api_id=Config.API_ID, api_hash=Config.API_HASH)
+bot = Client("AutoFilterBot", bot_token=Config.BOT_TOKEN, api_id=int(Config.API_ID), api_hash=Config.API_HASH)
 
-@bot.on_message(filters.command("start"))
+@bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     buttons = [
         [InlineKeyboardButton("📚 Help", callback_data="help"),
@@ -28,7 +28,9 @@ async def search_files(client, message):
         return
 
     buttons = [[InlineKeyboardButton(file, callback_data=f"get_{file}")] for file in files[:10]]
-    buttons.append([InlineKeyboardButton("➡️ Next", callback_data=f"next_{query}_1")])
+
+    if len(files) > 10:
+        buttons.append([InlineKeyboardButton("➡️ Next", callback_data=f"next_{query}_1")])
 
     await message.reply_text("📂 **Matching Files:**", reply_markup=InlineKeyboardMarkup(buttons))
 
@@ -40,10 +42,11 @@ async def send_file(client, query):
     if get_tokens(user_id) > 0:
         deduct_token(user_id)
         await bot.send_document(user_id, file_name)
-        await query.answer("📂 File sent in DM!")
+        await query.answer("📂 File sent in DM!", show_alert=True)
     else:
         await send_verification_link(bot, query.message)
 
+# Web server for Koyeb
 app = Flask(__name__)
 
 @app.route('/')
@@ -53,7 +56,7 @@ def home():
 def run_web():
     app.run(host="0.0.0.0", port=8000)
 
-# Start the bot and web server together
+# Start bot and web server
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
     bot.run()
