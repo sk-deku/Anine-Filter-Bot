@@ -1,7 +1,7 @@
 import os
 
 class Config:
-    API_ID = int(os.getenv("API_ID", "15072022"))  # Ensures API_ID is an integer
+    API_ID = int(os.getenv("API_ID", 15072022))  # Ensures API_ID is an integer
     API_HASH = os.getenv("API_HASH", "16b9f1767df306b369039fee1202970d")  # Should be a valid hash
     BOT_TOKEN = os.getenv("BOT_TOKEN", "7204165447:AAEgaDNLMSdTkRT2NjxP4NcwFb6jAX07DXQ")  # Bot token from BotFather
     DATABASE_URL = os.getenv("DATABASE_URL", "mongodb+srv://AnimeFireBot: Skesavan7@cluster0.zu5mx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")  # MongoDB connection URL
