@@ -1,1 +1,1 @@
-worker: python3 bot.py >> bot.log 2>&1
+worker: python3 bot.py
