@@ -1,76 +1,98 @@
-import threading
-import http.server
-import socketserver
+import logging
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import get_files, get_tokens, deduct_token
 from verification import send_verification_link
 from config import Config
+from premium import premium_info
+from admin import add_tokens_admin
+import threading
 
-# Initialize Pyrogram Bot
-bot = Client("AutoFilterBot", bot_token=Config.BOT_TOKEN, api_id=Config.API_ID, api_hash=Config.API_HASH)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
-# Define HTTP Server Port
-PORT = 8000
+bot = Client(
+    "AutoFilterBot",
+    bot_token=Config.BOT_TOKEN,
+    api_id=Config.API_ID,
+    api_hash=Config.API_HASH
+)
 
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Bot is running!")
-
-# Function to Start HTTP Server
-def run_http_server():
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        print(f"HTTP Server Running on Port {PORT}")
-        httpd.serve_forever()
-
+# ================== HANDLERS ================== #
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     buttons = [
         [InlineKeyboardButton("📚 Help", callback_data="help"),
-         InlineKeyboardButton("📢 Support", url="https://t.me/your-support-group")],
+         InlineKeyboardButton("📢 Support", url="https://t.me/yourgroup")],
         [InlineKeyboardButton("✅ Verify", callback_data="verify"),
-         InlineKeyboardButton("💰 Buy Tokens", callback_data="premium")]
+         InlineKeyboardButton("💰 Premium", callback_data="premium")]
     ]
-    await message.reply_text("👋 Welcome! Use me to find files easily.", reply_markup=InlineKeyboardMarkup(buttons))
+    await message.reply_text(
+        "👋 Hi! I'm your file search bot.",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
 
 @bot.on_message(filters.text & filters.group)
-async def search_files(client, message):
-    query = message.text
-    files = get_files(query)
+async def handle_search(client, message):
+    query = message.text.strip()
+    results = get_files(query)
     
-    if not files:
+    if not results:
         await message.reply_text("❌ No files found.")
         return
 
-    buttons = [[InlineKeyboardButton(file, callback_data=f"get_{file}")] for file in files[:10]]
+    buttons = [
+        [InlineKeyboardButton(
+            res["file_name"], 
+            callback_data=f"file_{res['file_id']}"
+        )] for res in results[:10]
+    ]
+    
+    if len(results) > 10:
+        buttons.append([InlineKeyboardButton("Next ➡️", callback_data=f"next_{query}_1")])
 
-    if len(files) > 10:
-        buttons.append([InlineKeyboardButton("➡️ Next", callback_data=f"next_{query}_1")])
+    await message.reply_text(
+        f"🔍 Found {len(results)} files:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
 
-    await message.reply_text("📂 **Matching Files:**", reply_markup=InlineKeyboardMarkup(buttons))
-
-@bot.on_callback_query(filters.regex(r"get_(.+)"))
+@bot.on_callback_query(filters.regex(r"^file_(.+)"))
 async def send_file(client, query):
     user_id = query.from_user.id
-    file_name = query.matches[0].group(1)
+    file_id = query.matches[0].group(1)
     
     if get_tokens(user_id) > 0:
         try:
             deduct_token(user_id)
-            await bot.send_document(user_id, file_name)
-            await query.answer("📂 File sent in DM!", show_alert=True)
+            await bot.send_document(user_id, file_id)
+            await query.answer("📄 File sent to your DM!", show_alert=True)
         except Exception as e:
+            logger.error(f"File send error: {e}")
             await query.answer("❌ Failed to send file.", show_alert=True)
     else:
         await send_verification_link(bot, query.message)
 
-# Start the bot and HTTP server
+@bot.on_callback_query(filters.regex("help"))
+async def show_help(client, query):
+    text = (
+        "🆘 **Help**\n\n"
+        "• Search files in groups\n"
+        "• Use /tokens to check balance\n"
+        "• Verify to get free tokens\n"
+        "• Buy tokens via /premium"
+    )
+    await query.message.edit_text(text)
+
+@bot.on_callback_query(filters.regex("verify"))
+async def trigger_verify(client, query):
+    await send_verification_link(bot, query.message)
+
+@bot.on_callback_query(filters.regex("premium"))
+async def show_premium(client, query):
+    await premium_info(bot, query.message)
+
 if __name__ == "__main__":
-    # Start HTTP server in a separate thread
-    threading.Thread(target=run_http_server, daemon=True).start()
-    
-    # Start Pyrogram Bot
     bot.run()
