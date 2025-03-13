@@ -36,6 +36,21 @@ async def start(client, message):
     ]
     await message.reply_text("👋 Welcome! Use me to find files easily.", reply_markup=InlineKeyboardMarkup(buttons))
 
+@bot.on_message(filters.command("help") & filters.private)
+async def help_command(client, message):
+    help_text = (
+        "📚 **Help Menu**\n"
+        "🔍 Search for files by sending a message in groups.\n"
+        "✅ Use /verify to get tokens for downloads.\n"
+        "💰 Buy premium tokens using /premium.\n"
+        "📢 Contact support if you need help."
+    )
+    await message.reply_text(help_text)
+
+@bot.on_message(filters.command("verify") & filters.private)
+async def verify_command(client, message):
+    await message.reply_text("🔗 Please use the verification link to get your tokens.")
+
 @bot.on_message(filters.text & filters.group)
 async def search_files(client, message):
     query = message.text
