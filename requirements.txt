@@ -1,6 +1,4 @@
-pyrogram
-tgcrypto
-pymongo
+pyrogram>=2.0.0
+pymongo[srv]
 requests
-pyshorteners
-flask
+python-dotenv
