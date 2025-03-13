@@ -1,4 +1,5 @@
 import requests
+from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import Config
 from database import add_tokens, users
