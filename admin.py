@@ -1,4 +1,4 @@
-from pyrogram import filters
+from pyrogram import Client, filters  # Added "Client" here
 from database import add_tokens
 from config import Config
 import logging
@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 @Client.on_message(filters.command("addtokens") & filters.user(Config.ADMINS))
-async def admin_add_tokens(client, message):
+async def add_tokens_admin(client, message):
     try:
         _, user_id, amount = message.text.split()
         user_id = int(user_id)
