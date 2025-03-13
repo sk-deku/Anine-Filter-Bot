@@ -49,7 +49,7 @@ async def help_command(client, message):
 
 @bot.on_message(filters.command("verify") & filters.private)
 async def verify_command(client, message):
-    await message.reply_text("🔗 Please use the verification link to get your tokens.")
+    await send_verification_link(bot, message)
 
 @bot.on_message(filters.text & filters.group)
 async def search_files(client, message):
