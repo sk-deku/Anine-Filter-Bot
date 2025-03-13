@@ -1,7 +1,7 @@
 import pymongo
 import logging
-from config import Config
 from pymongo.errors import ConnectionFailure, OperationFailure
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -12,11 +12,18 @@ try:
     users = db["users"]
     files = db["files"]
     
-    # Create index with error handling
-    try:
+    # Smart index creation
+    existing_indexes = files.index_information()
+    text_index_exists = any(
+        idx["key"][0][0] == "file_name" and idx["key"][0][1] == "text"
+        for idx in existing_indexes.values()
+    )
+    
+    if not text_index_exists:
         files.create_index([("file_name", "text")], name="search_index")
-    except OperationFailure as e:
-        logger.error(f"Index creation failed: {e}")
+        logger.info("Created text search index")
+    else:
+        logger.info("Using existing text index")
 
 except ConnectionFailure as e:
     logger.critical(f"MongoDB connection failed: {e}")
@@ -32,19 +39,15 @@ def save_file(file_id, file_name):
     except Exception as e:
         logger.error(f"File save error: {e}")
 
-# Other functions (get_files, get_tokens, etc) remain same as previous version
-
 def get_files(query):
     try:
-        return [{"file_name": doc["file_name"], "file_id": doc["file_id"]} for doc in files.find(
+        return [doc for doc in files.find(
             {"$text": {"$search": query}},
             {"score": {"$meta": "textScore"}}
         ).sort([("score", {"$meta": "textScore"})])]
     except Exception as e:
         logger.error(f"Search error: {e}")
         return []
-
-# Rest of the code remains the same...
 
 def get_tokens(user_id):
     try:
@@ -61,12 +64,10 @@ def deduct_token(user_id):
             {"$inc": {"tokens": -1}}
         )
     except Exception as e:
-        logger.error(f"Token deduction error: {e}")
+        logger.error(f"Deduction error: {e}")
 
 def add_tokens(user_id, amount):
     try:
-        if amount <= 0:
-            raise ValueError("Token amount must be positive")
         users.update_one(
             {"user_id": user_id},
             {"$inc": {"tokens": amount}},
@@ -74,6 +75,3 @@ def add_tokens(user_id, amount):
         )
     except Exception as e:
         logger.error(f"Add tokens error: {e}")
-
-def get_user_tokens(user_id):
-    return get_tokens(user_id)  # Alias for consistency
