@@ -2,9 +2,10 @@ import threading
 import http.server
 import socketserver
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import get_files, get_tokens, deduct_token
+from verification import send_verification_link
 from config import Config
-from commands import start_command, help_command, verify_command  # Import commands
 
 # Initialize Pyrogram Bot
 bot = Client("AutoFilterBot", bot_token=Config.BOT_TOKEN, api_id=int(Config.API_ID), api_hash=Config.API_HASH)
@@ -25,10 +26,20 @@ def run_http_server():
         print(f"HTTP Server Running on Port {PORT}")
         httpd.serve_forever()
 
-# Register Commands
-bot.add_handler(filters.command("start") & filters.private, start_command)
-bot.add_handler(filters.command("help") & filters.private, help_command)
-bot.add_handler(filters.command("verify") & filters.private, verify_command)
+@bot.on_message(filters.command("start") & filters.private)
+async def start(client, message):
+    buttons = [
+        [InlineKeyboardButton("📚 Help", callback_data="help"),
+         InlineKeyboardButton("📢 Support", url="https://t.me/your-support-group")],
+        [InlineKeyboardButton("✅ Verify", callback_data="verify"),
+         InlineKeyboardButton("💰 Buy Tokens", callback_data="premium")]
+    ]
+    await message.reply_text("👋 **Welcome!** Use me to find files easily.", reply_markup=InlineKeyboardMarkup(buttons))
+
+@bot.on_message(filters.command("verify") & filters.private)
+async def verify(client, message):
+    """Handles the /verify command and sends the verification link."""
+    await send_verification_link(client, message)
 
 @bot.on_message(filters.text & filters.group)
 async def search_files(client, message):
@@ -36,7 +47,7 @@ async def search_files(client, message):
     files = get_files(query)
     
     if not files:
-        await message.reply_text("❌ No files found.")
+        await message.reply_text("❌ **No files found.**")
         return
 
     buttons = [[InlineKeyboardButton(file, callback_data=f"get_{file}")] for file in files[:10]]
@@ -54,7 +65,7 @@ async def send_file(client, query):
     if get_tokens(user_id) > 0:
         deduct_token(user_id)
         await bot.send_document(user_id, file_name)
-        await query.answer("📂 File sent in DM!", show_alert=True)
+        await query.answer("📂 **File sent in DM!**", show_alert=True)
     else:
         await send_verification_link(bot, query.message)
 
