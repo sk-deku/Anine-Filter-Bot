@@ -4,4 +4,3 @@ requests
 python-dotenv
 TgCrypto
 python-dotenv
-pyrogram>=2.0.0
