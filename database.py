@@ -1,6 +1,6 @@
 import pymongo
-from pymongo.errors import ConnectionFailure
 from config import Config
+from pymongo.errors import ConnectionFailure
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,6 @@ try:
     db = client["AutoFilterBot"]
     users = db["users"]
     files = db["files"]
-    # Create index for faster searches
     files.create_index([("file_name", "text")])
 except ConnectionFailure as e:
     logger.error(f"Database connection failed: {e}")
@@ -22,10 +21,12 @@ def get_files(query):
         return [{"file_name": doc["file_name"], "file_id": doc["file_id"]} for doc in files.find(
             {"$text": {"$search": query}},
             {"score": {"$meta": "textScore"}}
-        ).sort([("score", {"$meta": "textScore"}])]
+        ).sort([("score", {"$meta": "textScore"})])]
     except Exception as e:
         logger.error(f"Search error: {e}")
         return []
+
+# Rest of the code remains the same...
 
 def get_tokens(user_id):
     try:
