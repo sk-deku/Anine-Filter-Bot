@@ -1,15 +1,13 @@
 import os
-from dotenv import load_dotenv
-load_dotenv()  # Load variables from .env file
 
 class Config:
-    # Mandatory variables - Throw error if missing
-    API_ID = int(os.environ["API_ID"])  # Use [] instead of getenv to enforce existence
+    # Mandatory Variables (will throw error if missing)
+    API_ID = int(os.environ["API_ID"])
     API_HASH = os.environ["API_HASH"]
     BOT_TOKEN = os.environ["BOT_TOKEN"]
     DATABASE_URL = os.environ["DATABASE_URL"]
-    
-    # Optional variables with defaults
+
+    # Optional Variables
     SHORTENER_API = os.getenv("SHORTENER_API", "5a6b57d3cbd44e9b81cda3a2ec9d93024fcc6838")
     SHORTENER_URL = os.getenv("SHORTENER_URL", "https://modijiurl.com/")
     ADMINS = list(map(int, os.getenv("ADMINS", "1775977570").split())) if os.getenv("ADMINS") else []
