@@ -1,7 +1,7 @@
 import pymongo
-from config import Config
-from pymongo.errors import ConnectionFailure
 import logging
+from config import Config
+from pymongo.errors import ConnectionFailure, OperationFailure
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +11,28 @@ try:
     db = client["AutoFilterBot"]
     users = db["users"]
     files = db["files"]
-    files.create_index([("file_name", "text")])
+    
+    # Create index with error handling
+    try:
+        files.create_index([("file_name", "text")], name="search_index")
+    except OperationFailure as e:
+        logger.error(f"Index creation failed: {e}")
+
 except ConnectionFailure as e:
-    logger.error(f"Database connection failed: {e}")
+    logger.critical(f"MongoDB connection failed: {e}")
     raise
+
+def save_file(file_id, file_name):
+    try:
+        files.update_one(
+            {"file_id": file_id},
+            {"$set": {"file_id": file_id, "file_name": file_name}},
+            upsert=True
+        )
+    except Exception as e:
+        logger.error(f"File save error: {e}")
+
+# Other functions (get_files, get_tokens, etc) remain same as previous version
 
 def get_files(query):
     try:
