@@ -1,27 +1,43 @@
 import logging
+import threading
+import signal
+from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import get_files, get_tokens, deduct_token
-from verification import send_verification_link
+from database import get_files, save_file, get_tokens, deduct_token
+from verification import send_verification_link, check_verification
 from config import Config
 from premium import premium_info
 from admin import add_tokens_admin
-import threading
 
+# ===== Flask Server =====
+app = Flask(__name__)
+
+@app.route("/")
+def health_check():
+    return "Bot Server Operational", 200
+
+def run_flask():
+    app.run(host="0.0.0.0", port=8000)
+
+# ===== Pyrogram Bot =====
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger(__name__)
 
 bot = Client(
-    "AutoFilterBot",
+    "AnimeFilterBot",
     bot_token=Config.BOT_TOKEN,
     api_id=Config.API_ID,
     api_hash=Config.API_HASH
 )
 
-# ================== HANDLERS ================== #
+def handle_shutdown(signum, frame):
+    logging.info("Graceful shutdown initiated...")
+    bot.stop()
+    exit(0)
+
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     buttons = [
@@ -46,9 +62,9 @@ async def handle_search(client, message):
 
     buttons = [
         [InlineKeyboardButton(
-            res["file_name"], 
-            callback_data=f"file_{res['file_id']}"
-        )] for res in results[:10]
+            doc["file_name"], 
+            callback_data=f"file_{doc['file_id']}"
+        )] for doc in results[:10]
     ]
     
     if len(results) > 10:
@@ -70,7 +86,7 @@ async def send_file(client, query):
             await bot.send_document(user_id, file_id)
             await query.answer("📄 File sent to your DM!", show_alert=True)
         except Exception as e:
-            logger.error(f"File send error: {e}")
+            logging.error(f"File send error: {e}")
             await query.answer("❌ Failed to send file.", show_alert=True)
     else:
         await send_verification_link(bot, query.message)
@@ -78,11 +94,10 @@ async def send_file(client, query):
 @bot.on_callback_query(filters.regex("help"))
 async def show_help(client, query):
     text = (
-        "🆘 **Help**\n\n"
-        "• Search files in groups\n"
-        "• Use /tokens to check balance\n"
-        "• Verify to get free tokens\n"
-        "• Buy tokens via /premium"
+        "🆘 **Help Menu**\n\n"
+        "• Use me in groups to search files\n"
+        "• Each download costs 1 token\n"
+        "• Get tokens via /premium or verification"
     )
     await query.message.edit_text(text)
 
@@ -92,7 +107,23 @@ async def trigger_verify(client, query):
 
 @bot.on_callback_query(filters.regex("premium"))
 async def show_premium(client, query):
-    await premium_info(bot, query.message)
+    await premium_info(client, query.message)
+
+@bot.on_message(filters.document & filters.private)
+async def store_file(client, message):
+    try:
+        file_id = message.document.file_id
+        file_name = message.document.file_name
+        save_file(file_id, file_name)
+        await message.reply("✅ File added to database!")
+    except Exception as e:
+        logging.error(f"File storage error: {e}")
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, handle_shutdown)
+    signal.signal(signal.SIGINT, handle_shutdown)
+    
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
     bot.run()
