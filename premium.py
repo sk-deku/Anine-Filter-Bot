@@ -1,7 +1,7 @@
 from pyrogram import filters
+from pyrogram import Client
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import Config
-from database import add_tokens
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,3 +22,4 @@ async def show_pricing(client, message):
     await message.reply_text(
         text,
         reply_markup=InlineKeyboardMarkup(buttons)
+    )  # Added closing parenthesis here
