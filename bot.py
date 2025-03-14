@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def health_check():
-    return "Bot Server Operational", 200
+    return "Bot is running", 200
 
 def run_flask():
     app.run(host="0.0.0.0", port=8000)
