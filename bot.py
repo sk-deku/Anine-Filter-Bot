@@ -64,7 +64,7 @@ async def search_handler(client, message):
                 doc["file_name"], 
                 callback_data=f"file_{doc['file_id']}"
             ) for doc in results[:10]
-        ]
+        ]]
         
         if len(results) > 10:
             buttons.append(
