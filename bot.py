@@ -1,6 +1,5 @@
 import logging
 import threading
-import signal
 from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -10,15 +9,12 @@ from config import Config
 from premium import premium_info
 from admin import add_tokens_admin
 
-# ===== Flask Server =====
+# ===== Flask Server for Health Checks =====
 app = Flask(__name__)
 
 @app.route("/")
 def health_check():
-    return "Bot is running", 200
-
-def run_flask():
-    app.run(host="0.0.0.0", port=8000)
+    return "Bot Server Running", 200
 
 # ===== Pyrogram Bot =====
 logging.basicConfig(
@@ -33,11 +29,7 @@ bot = Client(
     api_hash=Config.API_HASH
 )
 
-def handle_shutdown(signum, frame):
-    logging.info("Graceful shutdown initiated...")
-    bot.stop()
-    exit(0)
-
+# ===== Handlers =====
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     buttons = [
@@ -107,7 +99,7 @@ async def trigger_verify(client, query):
 
 @bot.on_callback_query(filters.regex("premium"))
 async def show_premium(client, query):
-    await premium_info(client, query.message)
+    await premium_info(bot, query.message)
 
 @bot.on_message(filters.document & filters.private)
 async def store_file(client, message):
@@ -119,11 +111,13 @@ async def store_file(client, message):
     except Exception as e:
         logging.error(f"File storage error: {e}")
 
+# ===== Start Services =====
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, handle_shutdown)
-    signal.signal(signal.SIGINT, handle_shutdown)
+    # Start Flask server
+    threading.Thread(
+        target=app.run,
+        kwargs={"host": "0.0.0.0", "port": 8000}
+    ).start()
     
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    
+    # Start bot
     bot.run()
