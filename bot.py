@@ -1,139 +1,144 @@
 import logging
-import threading
-from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import get_files, save_file, get_tokens, deduct_token
-from verification import send_verification_link, check_verification
 from config import Config
-from premium import premium_info
-from admin import add_tokens_admin
+from database import db
 
-# ===== Flask Server for Health Checks =====
-app = Flask(__name__)
-
-@app.route("/")
-def health_check():
-    return "🤖 Bot Server Running", 200
-
-# ===== Pyrogram Bot Setup =====
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 bot = Client(
-    "AnimeFilterBot",
-    bot_token=Config.BOT_TOKEN,
+    "FileIndexBot",
     api_id=Config.API_ID,
-    api_hash=Config.API_HASH
+    api_hash=Config.API_HASH,
+    bot_token=Config.BOT_TOKEN
 )
 
-# ===== Handlers =====
-
-# ... (previous imports and setup code)
-
-@bot.on_message(filters.command("start") & filters.private)
-async def start_handler(client, message):
+# ================== Indexing Handler ================== #
+@bot.on_message(filters.chat(Config.INDEX_CHANNEL) & 
+               (filters.document | filters.video | filters.audio))
+async def index_file(client, message):
     try:
-        buttons = [
-            [InlineKeyboardButton("📚 Help", callback_data="help"),
-             InlineKeyboardButton("📢 Support", url="https://t.me/yourgroup")],
-            [InlineKeyboardButton("✅ Verify", callback_data="verify"),
-             InlineKeyboardButton("💰 Premium", callback_data="premium")]
-        ]
-        await message.reply_text(  # Fixed parenthesis
-            "👋 Welcome! Use me to search and share files.",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )  # Added this closing parenthesis
+        file_type = None
+        if message.document:
+            file_type = "document"
+            file_id = message.document.file_id
+            file_name = message.document.file_name
+        elif message.video:
+            file_type = "video"
+            file_id = message.video.file_id
+            file_name = message.video.file_name
+        elif message.audio:
+            file_type = "audio"
+            file_id = message.audio.file_id
+            file_name = message.audio.file_name
+
+        file_data = {
+            'file_id': file_id,
+            'file_name': file_name,
+            'caption': message.caption.html if message.caption else "",
+            'file_type': file_type,
+            'date': message.date,
+            'channel_id': Config.MAIN_CHANNEL
+        }
+
+        if db.save_file(file_data):
+            await message.reply_text("✅ File indexed successfully!")
+        else:
+            await message.reply_text("❌ Failed to index file!")
+
     except Exception as e:
-        logging.error(f"Start handler error: {e}")
+        logging.error(f"Indexing error: {e}")
 
-@bot.on_message(filters.text & filters.group)
-async def search_handler(client, message):
+# ================== Search Handler ================== #
+@bot.on_message(filters.command("search") & filters.group)
+async def search_files(client, message):
     try:
-        query = message.text.strip()
-        results = get_files(query)
+        query = message.text.split(" ", 1)[1]
+        page = 1
+        
+        results = db.search_files(query, page)
+        total = db.get_total_results(query)
         
         if not results:
-            await message.reply_text("❌ No files found matching your query.")
-            return
+            return await message.reply_text("❌ No results found!")
 
-        buttons = [
-            [InlineKeyboardButton(
-                doc["file_name"], 
-                callback_data=f"file_{doc['file_id']}"
-            ) for doc in results[:10]
-        ]]
-        
-        if len(results) > 10:
-            buttons.append(
-                [InlineKeyboardButton("Next ➡️", callback_data=f"next_{query}_1")]
-            )
+        buttons = []
+        for file in results:
+            btn = [InlineKeyboardButton(
+                f"📁 {file['file_name']}",
+                callback_data=f"file_{file['file_id']}"
+            )]
+            buttons.append(btn)
 
-        await message.reply_text(  # Fixed parenthesis
-            f"🔍 Found {len(results)} results:",
+        # Add pagination if needed
+        if total > Config.RESULTS_PER_PAGE:
+            buttons.append([
+                InlineKeyboardButton("⬅️ Previous", callback_data=f"prev_{query}_{page}"),
+                InlineKeyboardButton(f"Page {page}", callback_data="ignore"),
+                InlineKeyboardButton("Next ➡️", callback_data=f"next_{query}_{page}")
+            ])
+
+        await message.reply_text(
+            f"🔍 Found {total} results for '{query}':\n\n"
+            f"📄 Showing page {page} ({len(results)} results)",
             reply_markup=InlineKeyboardMarkup(buttons)
-        )  # Added this closing parenthesis
+        )
+
+    except IndexError:
+        await message.reply_text("❗ Please provide a search query\nUsage: `/search query`")
     except Exception as e:
         logging.error(f"Search error: {e}")
+        await message.reply_text("❌ An error occurred during search!")
 
-# ... (rest of the code remains the same)
-
-@bot.on_callback_query(filters.regex(r"^file_(.+)"))
-async def file_handler(client, query):
+# ================== File Request Handler ================== #
+@bot.on_callback_query(filters.regex(r"^(file|prev|next)_"))
+async def handle_callbacks(client, callback_query):
     try:
-        user_id = query.from_user.id
-        file_id = query.matches[0].group(1)
-        
-        if get_tokens(user_id) > 0:
-            deduct_token(user_id)
-            await bot.send_document(user_id, file_id)
-            await query.answer("📁 File sent to your PM!", show_alert=True)
-        else:
-            await send_verification_link(bot, query.message)
+        data = callback_query.data.split("_")
+        action = data[0]
+
+        if action == "file":
+            file_id = data[1]
+            await client.send_cached_media(
+                chat_id=callback_query.message.chat.id,
+                file_id=file_id,
+                reply_to_message_id=callback_query.message.id
+            )
+            await callback_query.answer()
+
+        elif action in ["prev", "next"]:
+            query = data[1]
+            page = int(data[2])
+            new_page = page - 1 if action == "prev" else page + 1
+
+            results = db.search_files(query, new_page)
+            total = db.get_total_results(query)
+
+            buttons = []
+            for file in results:
+                btn = [InlineKeyboardButton(
+                    f"📁 {file['file_name']}",
+                    callback_data=f"file_{file['file_id']}"
+                )]
+                buttons.append(btn)
+
+            if total > Config.RESULTS_PER_PAGE:
+                buttons.append([
+                    InlineKeyboardButton("⬅️ Previous", callback_data=f"prev_{query}_{new_page}"),
+                    InlineKeyboardButton(f"Page {new_page}", callback_data="ignore"),
+                    InlineKeyboardButton("Next ➡️", callback_data=f"next_{query}_{new_page}")
+                ])
+
+            await callback_query.message.edit_reply_markup(
+                InlineKeyboardMarkup(buttons)
+            await callback_query.answer()
+
     except Exception as e:
-        logging.error(f"File handler error: {e}")
-        await query.answer("❌ Failed to send file", show_alert=True)
+        logging.error(f"Callback error: {e}")
+        await callback_query.answer("❌ Error processing request!", show_alert=True)
 
-@bot.on_callback_query(filters.regex("help"))
-async def help_handler(client, query):
-    help_text = (
-        "🆘 **Help Guide**\n\n"
-        "• Search files in groups using keywords\n"
-        "• Each download costs 1 token\n"
-        "• Get free tokens via verification\n"
-        "• Buy more tokens with /premium"
-    )
-    await query.message.edit_text(help_text)
-
-@bot.on_callback_query(filters.regex("verify"))
-async def verify_handler(client, query):
-    await send_verification_link(bot, query.message)
-
-@bot.on_callback_query(filters.regex("premium"))
-async def premium_handler(client, query):
-    await premium_info(bot, query.message)
-
-@bot.on_message(filters.document & filters.private)
-async def store_file_handler(client, message):
-    try:
-        file_id = message.document.file_id
-        file_name = message.document.file_name
-        save_file(file_id, file_name)
-        await message.reply("✅ File successfully added to database!")
-    except Exception as e:
-        logging.error(f"File storage error: {e}")
-        await message.reply("❌ Failed to store file")
-
-# ===== Startup =====
 if __name__ == "__main__":
-    # Start Flask server
-    threading.Thread(
-        target=app.run,
-        kwargs={"host": "0.0.0.0", "port": 8000},
-        daemon=True
-    ).start()
-    
-    # Start Pyrogram bot
     bot.run()
