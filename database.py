@@ -12,33 +12,28 @@ try:
     users = db["users"]
     files = db["files"]
     
-    # Handle existing index conflict
+    # Index management
+    target_index = [("file_name", "text")]
     index_name = "search_index"
     existing_indexes = files.index_information()
-    
-    # Check if our desired index exists
+
+    # Remove conflicting indexes
+    for name, index in existing_indexes.items():
+        if index['key'] == target_index and name != index_name:
+            logger.info(f"Removing old index: {name}")
+            files.drop_index(name)
+
+    # Create new index if needed
     if index_name not in existing_indexes:
-        # Check for conflicting old index
-        for name, index in existing_indexes.items():
-            if index['key'] == [('file_name', 'text')] and name != index_name:
-                logger.warning(f"Removing conflicting index: {name}")
-                files.drop_index(name)
-        
-        # Create new index
         try:
-            files.create_index(
-                [("file_name", "text")],
-                name=index_name
-            )
-            logger.info("Created new search index")
+            files.create_index(target_index, name=index_name)
+            logger.info("Created text search index")
         except OperationFailure as e:
-            logger.error(f"Index creation failed: {e}")
+            logger.error(f"Index error: {e}")
 
 except ConnectionFailure as e:
     logger.critical(f"MongoDB connection failed: {e}")
     raise
-
-# Rest of the database functions remain the same...
 
 def save_file(file_id, file_name):
     try:
@@ -49,6 +44,8 @@ def save_file(file_id, file_name):
         )
     except Exception as e:
         logger.error(f"File save error: {e}")
+
+# Other functions (get_files, get_tokens, etc.) remain same as previous versions
 
 def get_files(query):
     try:
