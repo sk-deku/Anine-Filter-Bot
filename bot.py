@@ -130,7 +130,7 @@ async def handle_callbacks(client, callback_query):
             buttons = []
             for file in results:
                 btn = [InlineKeyboardButton(
-                    f"📁 {file['file_name']",
+                    f"📁 {file['file_name']}",
                     callback_data=f"file_{file['file_id']}"
                 )]
                 buttons.append(btn)
