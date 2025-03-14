@@ -12,22 +12,33 @@ try:
     users = db["users"]
     files = db["files"]
     
-    # Smart index creation
+    # Handle existing index conflict
+    index_name = "search_index"
     existing_indexes = files.index_information()
-    text_index_exists = any(
-        idx["key"][0][0] == "file_name" and idx["key"][0][1] == "text"
-        for idx in existing_indexes.values()
-    )
     
-    if not text_index_exists:
-        files.create_index([("file_name", "text")], name="search_index")
-        logger.info("Created text search index")
-    else:
-        logger.info("Using existing text index")
+    # Check if our desired index exists
+    if index_name not in existing_indexes:
+        # Check for conflicting old index
+        for name, index in existing_indexes.items():
+            if index['key'] == [('file_name', 'text')] and name != index_name:
+                logger.warning(f"Removing conflicting index: {name}")
+                files.drop_index(name)
+        
+        # Create new index
+        try:
+            files.create_index(
+                [("file_name", "text")],
+                name=index_name
+            )
+            logger.info("Created new search index")
+        except OperationFailure as e:
+            logger.error(f"Index creation failed: {e}")
 
 except ConnectionFailure as e:
     logger.critical(f"MongoDB connection failed: {e}")
     raise
+
+# Rest of the database functions remain the same...
 
 def save_file(file_id, file_name):
     try:
