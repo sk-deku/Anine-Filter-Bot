@@ -31,6 +31,8 @@ bot = Client(
 
 # ===== Handlers =====
 
+# ... (previous imports and setup code)
+
 @bot.on_message(filters.command("start") & filters.private)
 async def start_handler(client, message):
     try:
@@ -40,9 +42,10 @@ async def start_handler(client, message):
             [InlineKeyboardButton("✅ Verify", callback_data="verify"),
              InlineKeyboardButton("💰 Premium", callback_data="premium")]
         ]
-        await message.reply_text(
+        await message.reply_text(  # Fixed parenthesis
             "👋 Welcome! Use me to search and share files.",
             reply_markup=InlineKeyboardMarkup(buttons)
+        )  # Added this closing parenthesis
     except Exception as e:
         logging.error(f"Start handler error: {e}")
 
@@ -60,7 +63,7 @@ async def search_handler(client, message):
             [InlineKeyboardButton(
                 doc["file_name"], 
                 callback_data=f"file_{doc['file_id']}"
-            )] for doc in results[:10]
+            ) for doc in results[:10]
         ]
         
         if len(results) > 10:
@@ -68,11 +71,14 @@ async def search_handler(client, message):
                 [InlineKeyboardButton("Next ➡️", callback_data=f"next_{query}_1")]
             )
 
-        await message.reply_text(
+        await message.reply_text(  # Fixed parenthesis
             f"🔍 Found {len(results)} results:",
             reply_markup=InlineKeyboardMarkup(buttons)
+        )  # Added this closing parenthesis
     except Exception as e:
         logging.error(f"Search error: {e}")
+
+# ... (rest of the code remains the same)
 
 @bot.on_callback_query(filters.regex(r"^file_(.+)"))
 async def file_handler(client, query):
